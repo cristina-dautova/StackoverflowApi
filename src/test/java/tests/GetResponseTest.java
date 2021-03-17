@@ -1,58 +1,43 @@
 package tests;
 
+import jsonobjects.Owner;
 import jsonobjects.Root;
+import org.apache.http.HttpStatus;
 import org.testng.annotations.Test;
-
-import java.lang.reflect.Array;
-import java.util.stream.Collectors;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.*;
+import org.testng.asserts.SoftAssert;
 
 public class GetResponseTest extends BaseTest {
 
-    @Test(priority = 1)
-    public void assertStatusCode() {
-        verifyStatusCode(200);
-    }
-
-    @Test(priority = 2)
+    @Test()
     public void assertArraySize() {
 
-        verifyResponseArraySize(root.backoff, 10);
-    }
+        SoftAssert softAssert = new SoftAssert();
 
-    @Test(priority = 3)
-    public void assertThatEachItemHasOwner() {
+        Root newRoot = getResponse(STACKOVERFLOW_PARAMETERS_URL)
+                .then()
+                .assertThat()
+                .statusCode(HttpStatus.SC_OK)
+                .extract()
+                .as(Root.class);
 
-        getResponse().then().assertThat().body("items", everyItem(hasKey("owner")));
+        softAssert.assertTrue(newRoot.backoff <= 10, "Item array size is incorrect: " + newRoot.backoff);
 
-        //verifyParentElementContainsChildElement("items", "owner");
-    }
+        for (int i = 0; i < newRoot.backoff; i++) {
+            Owner owner = newRoot.items.get(i).owner;
+            softAssert.assertNotNull(owner, "Item doesn't contain owner");
 
-    @Test(priority = 4)
-    public void isObjectLinkCorrect() {
+            if (owner == null) {
+                continue;
+            }
 
-//        assertThat(root.items.stream().map(e -> e.owner.link)).as("Owner link doesn't contain [" + "]")
-//                .contains(root.items.stream().map(e -> e.owner.display_name.toLowerCase().replace(" ", "-")).collect(Collectors.toList()).toString());
-
-        System.out.println(root.items.stream().map(e -> e.owner.link).collect(Collectors.toList()));
-
-
-
-        assertThat(root.items.stream().map(e -> e.owner.link).collect(Collectors.toList())).as("Owner link doesn't contain [" + "]")
-                .contains(root.items.stream().map(e -> e.owner.user_id).collect(Collectors.toList()).toString());
-
-        for (int i = 0; i < root.items.size(); i++) {
-            String link = root.items.get(i).owner.link;
-            System.out.println(link);
-            String userId = root.items.get(i).owner.user_id;
-            System.out.println(userId);
-            String displayName = root.items.get(i).owner.display_name;
-            System.out.println(displayName);
+            softAssert.assertEquals(owner.numberFromLink(), owner.user_id, owner.link);
+            softAssert.assertTrue(owner.link.contains("/" + owner.user_id + "/"),
+                    owner.link + " vs. " + owner.user_id);
+            softAssert.assertTrue(owner.link.endsWith("/" + owner.display_name.replace(" ", "-").toLowerCase()),
+                    owner.link + " vs. " + owner.display_name);
         }
-
-
-        //verifyUserLinkIsCorrect("items.owner", "link", "display_name", "user_id");
+        softAssert.assertAll();
     }
 }
+
+
